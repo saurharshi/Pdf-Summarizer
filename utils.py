@@ -1,6 +1,7 @@
 #import libraries
 import os
 from pypdf import PdfReader
+from langchain_core.documents import Document
 
 try:
     from langchain_text_splitters import CharacterTextSplitter
@@ -25,59 +26,85 @@ except ImportError:
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 
-def process_text(text):
+def process_pdf(pdf):
+    """Extracts text page by page with metadata, splits into chunks, and builds FAISS vector store."""
+    pdf_reader = PdfReader(pdf)
+    documents = []
 
-    # Split the text into smaller chunks for processing
+    # Extract text with page numbers as metadata
+    for i, page in enumerate(pdf_reader.pages):
+        page_text = page.extract_text() or ""
+        if page_text.strip():
+            documents.append(Document(page_content=page_text, metadata={"page": f"Page {i + 1}"}))
+
+    if not documents:
+        return None
+
+    # Split the text into smaller chunks
     text_splitter = CharacterTextSplitter(
         separator="\n",
         chunk_size=1000,
-        chunk_overlap=200, #overlap of 200 characters between chunks to maintain context
+        chunk_overlap=200,
         length_function=len
     )
-    chunks = text_splitter.split_text(text)  #split the text into chunks
+    chunks = text_splitter.split_documents(documents)
 
-    #load a model for generating embeddings from huggingface
+    # Load HuggingFace embeddings
     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
-    #create a FAISS vector store from the text chunks and their embeddings
-    knowledgebase = FAISS.from_texts(chunks, embeddings)
-    return  knowledgebase
+    # Create FAISS vector store from document chunks
+    knowledgebase = FAISS.from_documents(chunks, embeddings)
+    return knowledgebase
+
+
+def ask_question(knowledgebase, query):
+    """Retrieves top-k relevant chunks, computes similarity scores, and generates answer with citations."""
+    # Perform similarity search with score (FAISS returns L2 distance)
+    results = knowledgebase.similarity_search_with_score(query, k=3)
+
+    docs = [doc for doc, _ in results]
+
+    # Simple RAG evaluation: convert L2 distance to normalized similarity score (0 to 1)
+    eval_metrics = []
+    sources = []
+    for idx, (doc, dist) in enumerate(results):
+        page = doc.metadata.get("page", "Unknown")
+        if page not in sources:
+            sources.append(page)
+
+        # Convert distance to similarity score
+        sim_score = max(0.0, min(1.0, 1.0 - (float(dist) ** 2) / 2.0))
+        eval_metrics.append({
+            "chunk_num": idx + 1,
+            "page": page,
+            "score": round(sim_score, 2),
+            "snippet": doc.page_content[:120].strip()
+        })
+
+    # LLM Initialization
+    api_key = os.environ.get("GEMINI_API_KEY")
+    llm = ChatGoogleGenerativeAI(model="gemini-3.8-flash", google_api_key=api_key, temperature=0.3)
+
+    # QA chain
+    chain = load_qa_chain(llm, chain_type="stuff")
+
+    try:
+        answer = chain.run(input_documents=docs, question=query)
+    except AttributeError:
+        result = chain.invoke({"input_documents": docs, "question": query})
+        answer = result.get("output_text", str(result))
+
+    return {
+        "answer": answer,
+        "sources": sources,
+        "metrics": eval_metrics
+    }
+
 
 def summarizer(pdf):
-    # if a pdf file is provided
-
-    #read the pdf file 
-    pdf_reader = PdfReader(pdf)
-    text = ""
-    #extract text from each page of the pdf
-    for page in pdf_reader.pages:
-        text += page.extract_text() or ""  #handle cases where extract_text() returns None
-
-    if not text.strip():
+    """Backward compatible summarizer helper."""
+    knowledgebase = process_pdf(pdf)
+    if not knowledgebase:
         return "No readable text found in the PDF. Please ensure the PDF is not an image-only scan."
-
-    #proccess the extracted text to create a knowledge base
-    knowledgebase = process_text(text)
-
-    #define the query for summarization
-    query = "Summarize the content of the PDF in appropriately 3-5 sentences"
-
-    if query :
-        #perform a similarity search in the knowledge base using the query to retrieve relevant chunks of text
-        docs = knowledgebase.similarity_search(query)
-
-        #specify the model to use for generating the summary
-        api_key = os.environ.get("GEMINI_API_KEY")
-        llm = ChatGoogleGenerativeAI(model="gemini-3.8-flash", google_api_key=api_key, temperature=0.5)
-
-        #load a question-answering chain with the specified model
-        chain = load_qa_chain(llm, chain_type="stuff")
-
-        #run the chain on the retrieved documents and the query to generate a summary
-        try:
-            response = chain.run(input_documents=docs, question=query)
-        except AttributeError:
-            result = chain.invoke({"input_documents": docs, "question": query})
-            response = result.get("output_text", str(result))
-
-        return response #return the generated summary
+    result = ask_question(knowledgebase, "Summarize the content of the PDF in appropriately 3-5 sentences.")
+    return result["answer"]

@@ -67,7 +67,7 @@ def summarizer(pdf):
         docs = knowledgebase.similarity_search(query)
 
         #specify the model to use for generating the summary
-        api_key = os.environ.get("GEMINI_API_KEY", "AQ.Ab8RN6IccbFfBMe932prEBF5bnxmC1plxE4T_hfU31dGayKw9g")
+        api_key = os.environ.get("GEMINI_API_KEY")
         llm = ChatGoogleGenerativeAI(model="gemini-3.8-flash", google_api_key=api_key, temperature=0.5)
 
         #load a question-answering chain with the specified model

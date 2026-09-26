@@ -19,8 +19,12 @@ def main():
     #creating a button for user to submit their pdf for summarization
     submit = st.button(" Generate Summary")
 
-    #setting the Gemini API key from the environment variable
-    os.environ["GEMINI_API_KEY"] = "AQ.Ab8RN6IccbFfBMe932prEBF5bnxmC1plxE4T_hfU31dGayKw9g"
+    # retrieve the Gemini API key safely from environment variable or Streamlit secrets
+    if "GEMINI_API_KEY" not in os.environ:
+        try:
+            os.environ["GEMINI_API_KEY"] = st.secrets["GEMINI_API_KEY"]
+        except Exception:
+            pass
 
     #if the submit button is pressed 
     if submit:

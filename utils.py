@@ -57,7 +57,7 @@ def process_pdf(pdf):
     return knowledgebase
 
 
-def ask_question(knowledgebase, query):
+def ask_question(knowledgebase, query, api_key=None):
     """Retrieves top-k relevant chunks, computes similarity scores, and generates answer with citations."""
     # Perform similarity search with score (FAISS returns L2 distance)
     results = knowledgebase.similarity_search_with_score(query, k=3)
@@ -82,8 +82,11 @@ def ask_question(knowledgebase, query):
         })
 
     # LLM Initialization
-    api_key = os.environ.get("GEMINI_API_KEY")
-    llm = ChatGoogleGenerativeAI(model="gemini-3.8-flash", google_api_key=api_key, temperature=0.3)
+    key = api_key or os.environ.get("GEMINI_API_KEY")
+    if not key:
+        raise ValueError("GEMINI_API_KEY is missing. Please set it in your environment or enter it in the app.")
+
+    llm = ChatGoogleGenerativeAI(model="gemini-3.8-flash", google_api_key=key, temperature=0.3)
 
     # QA chain
     chain = load_qa_chain(llm, chain_type="stuff")
@@ -101,10 +104,10 @@ def ask_question(knowledgebase, query):
     }
 
 
-def summarizer(pdf):
+def summarizer(pdf, api_key=None):
     """Backward compatible summarizer helper."""
     knowledgebase = process_pdf(pdf)
     if not knowledgebase:
         return "No readable text found in the PDF. Please ensure the PDF is not an image-only scan."
-    result = ask_question(knowledgebase, "Summarize the content of the PDF in appropriately 3-5 sentences.")
+    result = ask_question(knowledgebase, "Summarize the content of the PDF in appropriately 3-5 sentences.", api_key=api_key)
     return result["answer"]

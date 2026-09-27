@@ -64,9 +64,9 @@ def main():
                             st.write("No specific page identified.")
 
                         # 3. Simple RAG Evaluation
-                        st.markdown("### 📊 RAG Evaluation:")
+                        st.markdown("### 📊 RAG Evaluation (Retrieval Quality):")
                         st.write(f"**Retrieved Chunks:** {len(result['metrics'])}")
-                        st.write("**Similarity Scores:**")
+                        st.write("**Cosine Similarity Scores:**")
                         for m in result["metrics"]:
                             st.write(f"- Chunk {m['chunk_num']} ({m['page']}) → **{m['score']}**")
                     except Exception as e:

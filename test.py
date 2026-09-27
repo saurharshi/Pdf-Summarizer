@@ -5,35 +5,25 @@ from utils import process_pdf, ask_question, summarizer
 
 load_dotenv()
 
+def get_api_key():
+    key = os.environ.get("GEMINI_API_KEY")
+    if not key:
+        try:
+            key = st.secrets.get("GEMINI_API_KEY")
+        except Exception:
+            pass
+    return key
+
+
 # main function to run the Streamlit app
 def main():
     # Set page configurations
-    st.set_page_config(page_title="PDF Summarizer", page_icon="📄")
+    st.set_page_config(page_title="PDF Summarizer", page_icon="📄", initial_sidebar_state="collapsed")
 
     # Title of the app
     st.title("📄 PDF Q&A and Summarizing App")
     st.write("Upload a PDF to ask questions with source citations or generate a summary.")
     st.divider()
-
-    # Sidebar for API Key setting
-    with st.sidebar:
-        st.header("⚙️ Settings")
-        env_key = os.environ.get("GEMINI_API_KEY", "")
-        if not env_key:
-            try:
-                env_key = st.secrets.get("GEMINI_API_KEY", "")
-            except Exception:
-                pass
-
-        user_api_key = st.text_input(
-            "Gemini API Key",
-            type="password",
-            value=env_key,
-            placeholder="Paste your key here",
-            help="Get your free key from https://aistudio.google.com/"
-        )
-        if user_api_key:
-            os.environ["GEMINI_API_KEY"] = user_api_key
 
     # File uploader for PDF files
     pdf = st.file_uploader("Choose a PDF file", type="pdf")
@@ -54,9 +44,9 @@ def main():
         ask_btn = st.button("Get Answer")
 
         if ask_btn and user_question:
-            active_key = os.environ.get("GEMINI_API_KEY")
+            active_key = get_api_key()
             if not active_key:
-                st.error("🔑 Gemini API key is missing. Please enter your API key in the left sidebar.")
+                st.error("🔑 Gemini API key is missing. Please ensure GEMINI_API_KEY is configured.")
             else:
                 with st.spinner("Retrieving relevant chunks and generating answer..."):
                     try:
@@ -82,7 +72,7 @@ def main():
                     except Exception as e:
                         err_str = str(e)
                         if "401" in err_str or "UNAUTHENTICATED" in err_str:
-                            st.error("❌ Authentication Error (401): Your Gemini API Key has been revoked or is invalid. Please create a new key at https://aistudio.google.com/ and paste it in the sidebar on the left.")
+                            st.error("❌ Authentication Error (401): Your Gemini API Key is invalid or expired.")
                         else:
                             st.error(f"❌ Error: {err_str}")
 
@@ -91,9 +81,9 @@ def main():
         # Summarize option
         st.subheader("📝 Or Generate a Summary")
         if st.button("Generate Summary"):
-            active_key = os.environ.get("GEMINI_API_KEY")
+            active_key = get_api_key()
             if not active_key:
-                st.error("🔑 Gemini API key is missing. Please enter your API key in the left sidebar.")
+                st.error("🔑 Gemini API key is missing. Please ensure GEMINI_API_KEY is configured.")
             else:
                 with st.spinner("Generating summary..."):
                     try:
@@ -109,7 +99,7 @@ def main():
                     except Exception as e:
                         err_str = str(e)
                         if "401" in err_str or "UNAUTHENTICATED" in err_str:
-                            st.error("❌ Authentication Error (401): Your Gemini API Key has been revoked or is invalid. Please create a new key at https://aistudio.google.com/ and paste it in the sidebar on the left.")
+                            st.error("❌ Authentication Error (401): Your Gemini API Key is invalid or expired.")
                         else:
                             st.error(f"❌ Error: {err_str}")
 

@@ -1,5 +1,8 @@
 #import libraries
 import os
+from dotenv import load_dotenv
+load_dotenv()
+
 from pypdf import PdfReader
 from langchain_core.documents import Document
 

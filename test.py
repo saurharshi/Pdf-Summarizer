@@ -8,7 +8,7 @@ load_dotenv()
 # main function to run the Streamlit app
 def main():
     # Set page configurations
-    st.set_page_config(page_title="PDF Q&A & Summarizer", page_icon="📄")
+    st.set_page_config(page_title="PDF Summarizer", page_icon="📄")
 
     # Title of the app
     st.title("📄 PDF Q&A and Summarizing App")

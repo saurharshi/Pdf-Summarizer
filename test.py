@@ -73,6 +73,8 @@ def main():
                         err_str = str(e)
                         if "401" in err_str or "UNAUTHENTICATED" in err_str:
                             st.error("❌ Authentication Error (401): Your Gemini API Key is invalid or expired.")
+                        elif "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                            st.error("⏳ Quota Exceeded (429): Free tier quota was temporarily reached. Please wait a few seconds and try again.")
                         else:
                             st.error(f"❌ Error: {err_str}")
 
@@ -100,6 +102,8 @@ def main():
                         err_str = str(e)
                         if "401" in err_str or "UNAUTHENTICATED" in err_str:
                             st.error("❌ Authentication Error (401): Your Gemini API Key is invalid or expired.")
+                        elif "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                            st.error("⏳ Quota Exceeded (429): Free tier quota was temporarily reached. Please wait a few seconds and try again.")
                         else:
                             st.error(f"❌ Error: {err_str}")
 

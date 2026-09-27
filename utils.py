@@ -84,21 +84,32 @@ def ask_question(knowledgebase, query, api_key=None):
             "snippet": doc.page_content[:120].strip()
         })
 
-    # LLM Initialization
+    # LLM Initialization with high-quota models and fallback
     key = api_key or os.environ.get("GEMINI_API_KEY")
     if not key:
         raise ValueError("GEMINI_API_KEY is missing. Please set it in your environment or enter it in the app.")
 
-    llm = ChatGoogleGenerativeAI(model="gemini-3.8-flash", google_api_key=key, temperature=0.3)
+    candidate_models = ["gemini-flash-lite-latest", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.8-flash"]
+    answer = None
+    last_err = None
 
-    # QA chain
-    chain = load_qa_chain(llm, chain_type="stuff")
+    for model_name in candidate_models:
+        try:
+            llm = ChatGoogleGenerativeAI(model=model_name, google_api_key=key, temperature=0.3)
+            chain = load_qa_chain(llm, chain_type="stuff")
+            try:
+                answer = chain.run(input_documents=docs, question=query)
+            except AttributeError:
+                result = chain.invoke({"input_documents": docs, "question": query})
+                answer = result.get("output_text", str(result))
+            if answer:
+                break
+        except Exception as e:
+            last_err = e
+            continue
 
-    try:
-        answer = chain.run(input_documents=docs, question=query)
-    except AttributeError:
-        result = chain.invoke({"input_documents": docs, "question": query})
-        answer = result.get("output_text", str(result))
+    if answer is None:
+        raise last_err or RuntimeError("Failed to generate response from available Gemini models.")
 
     return {
         "answer": answer,
